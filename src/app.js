@@ -23,64 +23,59 @@ app.set('trust proxy', 1);
 
 app.use(helmet());
 
-/* ================================
-   CORS CONFIGURATION
-================================ */
+/* =========================================
+   CORS
+========================================= */
 
 const allowedOrigins = [
-  env.CLIENT_ORIGIN?.trim().replace(/\/$/, ''),
   'https://flavorsify-website-chomfvx9g-flavorsify.vercel.app',
-];
-
-if (!isProd) {
-  allowedOrigins.push(
-    'http://localhost:5173',
-    'http://localhost:5174'
-  );
-}
+  env.CLIENT_ORIGIN?.trim().replace(/\/$/, ''),
+  'http://localhost:5173',
+  'http://localhost:5174',
+].filter(Boolean);
 
 app.use(
   cors({
-    origin(origin, cb) {
-      // Allow requests without an Origin header
+    origin: (origin, callback) => {
+      // Requests without an Origin header
       if (!origin) {
-        return cb(null, true);
+        return callback(null, true);
       }
 
-      // Normalize the incoming origin
       const normalizedOrigin = origin
         .trim()
         .replace(/\/$/, '');
 
-      // Check whether the origin is allowed
+      console.log('CORS request from:', normalizedOrigin);
+
       if (allowedOrigins.includes(normalizedOrigin)) {
-        return cb(null, true);
+        return callback(null, true);
       }
 
-      console.error('CORS blocked origin:', origin);
+      console.error('CORS blocked origin:', normalizedOrigin);
 
-      return cb(new Error('Origin not allowed'));
+      return callback(null, false);
     },
 
     credentials: true,
   })
 );
 
-/* ================================
-   BODY PARSING
-================================ */
+/* =========================================
+   BODY PARSER
+========================================= */
 
 app.use(express.json({ limit: '10kb' }));
 
-/* ================================
+/* =========================================
    COOKIE PARSER
-================================ */
+========================================= */
 
 app.use(cookieParser());
 
-/* ================================
+/* =========================================
    PUBLIC API ROUTES
-================================ */
+========================================= */
 
 app.use('/api/health', healthRoutes);
 
@@ -88,9 +83,9 @@ app.use('/api/enquiries', enquiryRoutes);
 
 app.use('/api/products', productsRoutes);
 
-/* ================================
+/* =========================================
    PROTECTED ADMIN API ROUTES
-================================ */
+========================================= */
 
 app.use('/api/admin/auth', adminAuthRoutes);
 
@@ -100,9 +95,9 @@ app.use('/api/admin/enquiries', adminEnquiriesRoutes);
 
 app.use('/api/admin/uploads', adminUploadRoutes);
 
-/* ================================
+/* =========================================
    ERROR HANDLING
-================================ */
+========================================= */
 
 app.use(notFound);
 

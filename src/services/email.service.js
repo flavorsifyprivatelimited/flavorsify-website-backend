@@ -1,37 +1,9 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 import { env } from "../config/env.js";
 
+const resend = new Resend(env.RESEND_API_KEY);
+
 export async function sendEnquiryEmail(enquiry) {
-  if (!env.SMTP_USER || !env.SMTP_APP_PASSWORD) {
-    console.warn(
-      "Email notification skipped: SMTP credentials are not configured."
-    );
-    return;
-  }
-
-  /*
-   * Gmail SMTP
-   *
-   * Port 587 uses STARTTLS.
-   * We explicitly configure the connection instead of
-   * using Nodemailer's `service: "gmail"` shortcut.
-   */
-  const transporter = nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false,
-    requireTLS: true,
-
-    auth: {
-      user: env.SMTP_USER,
-      pass: env.SMTP_APP_PASSWORD,
-    },
-
-    connectionTimeout: 30000,
-    greetingTimeout: 30000,
-    socketTimeout: 30000,
-  });
-
   const submittedAt = enquiry.createdAt
     ? new Date(enquiry.createdAt).toLocaleString("en-IN", {
         timeZone: "Asia/Kolkata",
@@ -40,18 +12,11 @@ export async function sendEnquiryEmail(enquiry) {
         timeZone: "Asia/Kolkata",
       });
 
-  await transporter.sendMail({
-    from: `"Flavorsify Website" <${env.SMTP_USER}>`,
+  const subject = `New Website Enquiry: ${
+    enquiry.product || "General Enquiry"
+  }`;
 
-    to: env.ENQUIRY_NOTIFY_EMAIL,
-
-    replyTo: enquiry.email,
-
-    subject: `New Website Enquiry: ${
-      enquiry.product || "General Enquiry"
-    }`,
-
-    text: `
+  const text = `
 A new enquiry has been submitted through the Flavorsify website.
 
 Name: ${enquiry.name}
@@ -66,10 +31,27 @@ ${enquiry.message}
 
 Received: ${submittedAt}
 Enquiry ID: ${enquiry._id}
-    `.trim(),
+  `.trim();
+
+  const { data, error } = await resend.emails.send({
+    from: "Flavorsify Website <onboarding@resend.dev>",
+    to: [env.ENQUIRY_NOTIFY_EMAIL],
+    replyTo: enquiry.email,
+    subject,
+    text,
   });
 
+  if (error) {
+    console.error("Resend email notification failed:", error);
+
+    throw new Error(
+      error.message || "Failed to send enquiry email."
+    );
+  }
+
   console.log(
-    `Enquiry email notification sent for ${enquiry._id}`
+    `Enquiry email notification sent for ${enquiry._id}. Resend ID: ${data?.id}`
   );
+
+  return data;
 }

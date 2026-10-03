@@ -2,8 +2,9 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import productsRoutes from "./routes/products.routes.js";
-import adminUploadRoutes from "./routes/admin-upload.routes.js";
+
+import productsRoutes from './routes/products.routes.js';
+import adminUploadRoutes from './routes/admin-upload.routes.js';
 
 import { env, isProd } from './config/env.js';
 
@@ -22,7 +23,14 @@ app.set('trust proxy', 1);
 
 app.use(helmet());
 
-const allowedOrigins = [env.CLIENT_ORIGIN];
+/* ================================
+   CORS CONFIGURATION
+================================ */
+
+const allowedOrigins = [
+  env.CLIENT_ORIGIN?.trim().replace(/\/$/, ''),
+  'https://flavorsify-website-chomfvx9g-flavorsify.vercel.app',
+];
 
 if (!isProd) {
   allowedOrigins.push(
@@ -34,34 +42,70 @@ if (!isProd) {
 app.use(
   cors({
     origin(origin, cb) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      // Allow requests without an Origin header
+      if (!origin) {
         return cb(null, true);
       }
 
-      cb(new Error('Origin not allowed'));
+      // Normalize the incoming origin
+      const normalizedOrigin = origin
+        .trim()
+        .replace(/\/$/, '');
+
+      // Check whether the origin is allowed
+      if (allowedOrigins.includes(normalizedOrigin)) {
+        return cb(null, true);
+      }
+
+      console.error('CORS blocked origin:', origin);
+
+      return cb(new Error('Origin not allowed'));
     },
+
     credentials: true,
   })
 );
 
+/* ================================
+   BODY PARSING
+================================ */
+
 app.use(express.json({ limit: '10kb' }));
 
-// Read cookies for admin authentication
+/* ================================
+   COOKIE PARSER
+================================ */
+
 app.use(cookieParser());
 
-// Public API routes
+/* ================================
+   PUBLIC API ROUTES
+================================ */
+
 app.use('/api/health', healthRoutes);
+
 app.use('/api/enquiries', enquiryRoutes);
-app.use("/api/products", productsRoutes);
 
-// Protected admin API routes
+app.use('/api/products', productsRoutes);
+
+/* ================================
+   PROTECTED ADMIN API ROUTES
+================================ */
+
 app.use('/api/admin/auth', adminAuthRoutes);
-app.use('/api/admin/products', adminProductsRoutes);
-app.use('/api/admin/enquiries', adminEnquiriesRoutes);
-app.use("/api/admin/uploads", adminUploadRoutes);
 
-// Error handling
+app.use('/api/admin/products', adminProductsRoutes);
+
+app.use('/api/admin/enquiries', adminEnquiriesRoutes);
+
+app.use('/api/admin/uploads', adminUploadRoutes);
+
+/* ================================
+   ERROR HANDLING
+================================ */
+
 app.use(notFound);
+
 app.use(errorHandler);
 
 export default app;
